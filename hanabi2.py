@@ -272,5 +272,5 @@ tom = Player(d, "tom",1)
 ren = Player(d, "ren",2)
 # print(ren.possible_hints)
 
-b= Board(d)4
+b= Board(d)
 b.start_game(3)
