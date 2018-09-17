@@ -30,6 +30,17 @@ socket.on("connection", function(socket){
   socket.join("living room")
 })
 
+socket.on("server.game_data", function(game_data){
+  console.log(game_data)
+})
+
+var get_hands=function() {
+socket.emit("client.get_hands",function(own_hand,other_hands){
+  console.log(own_hand);
+  console.log(other_hands);
+});
+}
+
 function getCookieValue(a) {
     var b = document.cookie.match('(^|;)\\s*' + a + '\\s*=\\s*([^;]+)');
     return b ? b.pop() : '';

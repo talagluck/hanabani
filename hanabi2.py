@@ -12,8 +12,17 @@ class Tile(object):
         self.name = f'{self.color},{self.value}'
         self.notes = []
 
+
     def __repr__(self):
-        return f'{self.color},{self.value}'
+        return self.name
+
+    def json(self):
+        return {
+        'color': self.color,
+        'value': self.value,
+        'notes': self.notes
+        }
+
 
 class Deck(object):
     tiles = []
@@ -68,23 +77,28 @@ class Deck(object):
 class Player(object):
     index_letters ={0:'a',1:'b',2:'c',3:'d'}
     player_number_range=[]
-    def __init__(self, deck, name, number):
+    def __init__(self, game, name, client_id):
+        self.client_id = client_id
         self.tile_number = 10
         self.name = name
-        self.number = number
-        Player.player_number_range.append(self.number)
+        self.game=game
+        self.deck=self.game.deck
+        # Player.player_number_range.append(self.number)
         self.possible_hints={'color':set([]),'value':set([])}
-        self.hand = [[{'label':'a'}],
-                    [{'label':'b'}],
-                    [{'label':'c'}],
-                    [{'label':'d'}]]
+        self.hand = {
+            'a': 0,
+            'b': 0,
+            'c': 0,
+            'd': 0
+        }
 
-        dealt = deck.deal_hand() #create initial hand and deal it out
-        # i=0
-        for i, position in enumerate(self.hand):
-            position.append(dealt[i])
+        dealt = self.game.deck.deal_hand() #create initial hand and deal it out
+        i=0
+        for key, value in self.hand.items():
+            self.hand[key]=dealt[i]
+            i+=1
             # print(self.name,self.tile_number,position[1].notes, position[1])
-            self.add_number_to_notes(i)
+            self.add_number_to_notes(key)
 
 
         self.populate_hints()
@@ -93,83 +107,112 @@ class Player(object):
         # return str(self.hand)
         return self.name
 
-    def add_number_to_notes(self,tile_index):
-        tile_to_note = self.hand[tile_index][1]
+    def display_hands(self):
+        hands={}
+        for player in self.game.player_list:
+            hands[player.client_id]=player.hand
+
+        return hands
+
+    def add_number_to_notes(self,tile_key):
+        tile_to_note = self.hand[tile_key]
         tile_to_note.notes.append(self.tile_number)
         self.tile_number+=1
 
     def populate_hints(self):
-        for tile in self.hand:
-            self.possible_hints['color'].add(tile[1].color)
-            self.possible_hints['value'].add(tile[1].value)
-
-    def give_tile(self, tile_letter):
-        given_tile = [tile for tile in self.hand if tile[0]['label'] == tile_letter][0]
-        given_tile_index = self.hand.index(given_tile)
-        given_tile = self.hand[given_tile_index].pop(1) #remove the actual played tile from the hand
         self.possible_hints['color'].clear()
         self.possible_hints['value'].clear()
-        return given_tile, given_tile_index
+        for key,tile in self.hand.items():
+            self.possible_hints['color'].add(tile.color)
+            self.possible_hints['value'].add(tile.value)
 
-    def receive_tile(self, deck, idx, letter):
-        new_dealt_tile = deck.deal_tile()[0]
-        self.hand[idx].append(new_dealt_tile)
-        self.add_number_to_notes(idx)
+    def give_tile(self, tile_key):
+        given_tile = self.hand[tile_key]
+        # given_tile_index = self.hand.index(given_tile)
+        # given_tile = self.hand[given_tile_index].pop(1) #remove the actual played tile from the hand
+        self.hand[tile_key]=0
+        return given_tile,tile_key
+
+    def receive_tile(self, tile_key):
+        new_dealt_tile = self.game.deck.deal_tile()[0]
+        self.hand[tile_key]=new_dealt_tile
+        self.hand[tile_key].notes.append(self.tile_number)
+        self.tile_number+=1
+        # self.add_number_to_notes(tile_key)
         self.populate_hints()
-        print(f'{self.name} drew a new tile to position {Player.index_letters[idx]}')
+        print(f'{self.name} drew a new tile to position {Player.index_letters[tile_key]}')
 
-    def play_tile(self, tile_letter, deck, board):
+    def play_tile(self, tile_key):
         # print(self.hand)
-        played_tile, played_tile_index = self.give_tile(tile_letter)
+        played_tile, played_tile_key = self.give_tile(tile_key)
 
         # self.parse_tile(played_tile['hidden']) #get parse_color and parse_value
 
         #add tile to board and deal with board_state
         if played_tile.value - 1 == board.board_state[played_tile.color]:
             #if a pile is successfully completed
-            board.board_state[played_tile.color] +=1
+            self.game.board.board_state[played_tile.color] +=1
             print(f'{self.name} successfully played the {played_tile.color} {played_tile.value}')
 
             #if a pile is completed
             if played_tile.value == 5:
-                board.board_state[played_tile.color.upper()]=board.board_state.pop(played_tile.color)
-                if board.hints < board.max_hints:
-                    board.hints+=1
+                self.game.board.board_state[played_tile.color.upper()]=self.game.board.board_state.pop(played_tile.color)
+                if self.game.board.hints < self.game.board.max_hints:
+                    self.game.board.hints+=1
                 print(f'Congrats! You finished the {played_tile.color} stack, and gained back a hint.')
         else:
             #if a play is not successfully completed
-            board.explosions-=1
+            self.game.board.explosions-=1
             print(f'''BOOM!\nThere was no available place on the board for the {played_tile.color} {played_tile.value}.\nYou have {board.explosions} tries remaining!''')
-
-        self.receive_tile(deck, played_tile_index, tile_letter)
+            self.game.board.discard_pile.append(played_tile)
+        self.receive_tile(tile_key)
         # print(self.hand)
         return('')
 
 
-    def discard_tile(self, tile_letter, deck, board):
+    def discard_tile(self, tile_key):
         print(self.hand)
-        discarded_tile, discarded_tile_index = self.give_tile(tile_letter)
+        discarded_tile, discarded_tile_key = self.give_tile(tile_key)
 
-        board.discard_pile.append(discarded_tile)
-        if board.hints < board.max_hints:
-            board.hints+=1
+        self.game.board.discard_pile.append(discarded_tile)
+        if self.game.board.hints < self.game.board.max_hints:
+            self.game.board.hints+=1
         print(f'{self.name} discarded a {discarded_tile.color} {discarded_tile.value}, and gained back a hint.')
-        print(f'Discard pile consists of {board.discard_pile}')
-        self.receive_tile(deck, discarded_tile_index, tile_letter)
+        print(f'Discard pile consists of {self.game.board.discard_pile}')
+        self.receive_tile(discarded_tile_key)
         # print(self.hand)
         return('')
 
-    def give_hint(self,player,hint,board):
+    def give_hint(self,player,hint):
         if board.hints>0:
-            for tile in player.hand:
-                if tile[1].color == hint:
-                    tile[1].notes.append(hint)
-                if tile[1].value == hint:
-                    tile[1].notes.append(hint)
-            board.hints-=1
+            for key,tile in player.hand.items():
+                if tile.color == hint:
+                    tile.notes.append(hint)
+                if tile.value == hint:
+                    tile.notes.append(hint)
+            self.game.board.hints-=1
         else:
             print("No hints remain. Please discard a tile to regain a hint, or play a tile.")
 
+
+    def serialize_hand(self):
+        serialized_hand=[]
+        for key, tile in self.hand.items():
+            hand.append(tile.json())
+        return serialized_hand
+
+    def serialize_other_hands(self):
+        serialized_hands=[]
+        for player in self.game.player_list:
+            if player.client_id != self.client_id:
+                serialized_hands.append(player.serialize_hand)
+        return serialized_hands
+
+    def serialize_own_hand(self):
+        serialized_own_hand=[]
+        for key,tile in self.hand.items():
+            serialized_own_hand.append({key: tile.notes})
+        return serialized_own_hand
 
     def take_turn(self, board): #can play a tile, discard a tile, or give a hint
         while True:
@@ -228,9 +271,8 @@ class Player(object):
 
 class Board(object):
 
-    def __init__(self, deck):
+    def __init__(self):
         self.max_hints = 8
-        self.deck = deck
         self.discard_pile = []
         self.explosions = 3
         self.hints = self.max_hints
@@ -241,18 +283,44 @@ class Board(object):
             self.board_state[color]=0
 
     def __repr__(self):
-        return f'''board: {self.board_state}\nexplosions remaining: {self.explosions}\nhints remaining: {self.hints}\ntiles remaining: {self.deck.count()}'''
+        return f'''board: {self.board_state}\nexplosions remaining: {self.explosions}\nhints remaining: {self.hints}\n'''
+#add deck to player
 
-    def start_game(self,number_of_players):
-        for i in range(0,number_of_players):
-            name = input(f'Please enter the name of Player {i+1}')
-            player = Player(self.deck, name, i+1)
-            self.player_list.append(player)
-            self.player_name_list.append(player.name)
 
-        while True:
-            for player in self.player_list:
-                player.take_turn(self)
+
+class Game(object):
+    GAME_CREATED=1
+    GAME_PLAYING=2
+    GAME_LAST_TURN = 3
+    GAME_LOST_DECK_DEPLETED=4
+    GAME_LOST_EXPLODED=5
+    GAME_WON=6
+
+    def __init__(self,game_ID, max_players,mode,max_hints,max_lives):
+        self.game_ID = game_ID
+        self.max_players = max_players
+        self.max_hints = max_hints
+        self.max_lives = max_lives
+        self.mode = mode
+        self.deck = Deck()
+        self.board = Board()
+        self.player_list=[]
+        self.state = Game.GAME_CREATED
+
+    def add_player(self,name,client_id):
+        player = Player(self.game, name, client_id)
+        self.player_list.append(player)
+
+
+class Game_House(object):
+    def __init__(self):
+        self.games = {}
+
+    def new_game(self, game_ID, max_players,mode,max_hints,max_lives):
+        game = Game(game_ID, max_players,mode,max_hints,max_lives)
+        self.games[game_ID] = game
+
+
 
 
 
@@ -265,12 +333,24 @@ class Board(object):
 
 # # tile = Tile('red','5')
 # # print(tile)
-d = Deck()
 
-tom = Player(d, "tom",1)
+#
+# tom = Player(d, "tom",1)
+#
+# ren = Player(d, "ren",2)
+# # print(ren.possible_hints)
+#
+game_house = Game_House()
 
-ren = Player(d, "ren",2)
-# print(ren.possible_hints)
 
-b= Board(d)
-b.start_game(3)
+d=Deck()
+b= Board()
+t = Tile('red','5')
+g = Game("game_ID", "max_players","mode","max_hints","max_lives")
+tom = Player(g,"tom",22323)
+print(tom.hand)
+for key,value in tom.hand.items():
+    print(value.notes)
+
+
+# b.start_game(2)
