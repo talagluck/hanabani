@@ -17,20 +17,24 @@ def index():
 def handle_on_connect():
     return
 
-@socketio.on('client.new_game')
-def new_game(max_players,mode,max_hints,max_lives):
-    game_house.new_game(session["game_ID"], max_players,mode,max_hints,max_lives)
 
-
-@socketio.on('user joined')
+@socketio.on('client.user_joined')
 def user_joined(client_ID):
     session["game_ID"] ="living room"
     session["client_ID"] = client_ID
+    print('user joined', client_ID)
+
+    if session["game_ID"] not in game_house.games:
+        game_house.new_game(session["game_ID"], 5,5,8,3)
+
     join_room(session["game_ID"])
+    # print("reload!")
 
 @socketio.on('client.add_player')
 def add_player(name, client_ID):
     current_game().add_player(name, client_ID)
+    print("Player added: ", name)
+    print("sdbjkbdjks")
 
 @socketio.on('client.list_players')
 def list_players():
@@ -38,14 +42,15 @@ def list_players():
 
 @socketio.on('client.start_game')
     #if session.id = host enable them to start
-    def start_game():
-         current_game.state = GAME_PLAYING
+def start_game():
+    if not current_game().start_game():
+        print("Game already started")
 
 @socketio.on('client.get_hands')
-    def get_hands():
-        own_hand=current_player().serialize_own_hand
-        other_hands=current_player().serialize_other_hands
-        return own_hand,other_hands
+def get_hands():
+    own_hand=current_player().serialize_own_hand()
+    other_hands=current_player().serialize_other_hands()
+    return own_hand,other_hands
 
 
 @socketio.on('client.request_update')
@@ -64,8 +69,9 @@ def test_message(message):
 def current_game():
     return game_house.games[session["game_ID"]]
 
+
 def current_player():
-    current_game.player_list[session["client_ID"]]
+    return current_game().get_player(session["client_ID"])
 
 if __name__ == '__main__':
-    socketio.run(app,host='0.0.0.0')
+    socketio.run(app,host='0.0.0.0', use_reloader=True, debug=True)

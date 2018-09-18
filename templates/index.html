@@ -8,34 +8,39 @@
   <script src = "/socket.io.slim.js"></script>
   <script>
 
+var clientID = undefined;
+
 var socket = io();
 $(function(){
 
-  if (getCookieValue("hanabi_user_id")==""){
-    document.cookie = "hanabi_user_id=" + btoa(Math.random()).substr(5,10);
+  if (getCookieValue("hanabi_client_id")==""){
+    document.cookie = "hanabi_client_id=" + btoa(Math.random()).substr(5,10);
   }
 
-  var userID = getCookieValue("hanabi_user_id");
+  clientID = getCookieValue("hanabi_client_id");
 
 
-  socket.emit("user joined", userID);
-
-  socket.on("server response", function(data){
-    alert("We have received an event");
-    console.log(data);
-  });
+  socket.emit("client.user_joined", clientID);
 
 })
-socket.on("connection", function(socket){
-  socket.join("living room")
+
+socket.on("server.game_data", function(gameData){
+  console.log(gameData)
 })
 
-socket.on("server.game_data", function(game_data){
-  console.log(game_data)
-})
+var newGame = function(maxPlayers,mode,maxHints,maxLives){
+  socket.emit("client.new_game",maxPlayers,mode,maxHints,maxLives)
+  console.log("new game")
+}
+var startGame = function(){
+  socket.emit("client.start_game")
+}
+var addPlayer = function(name){
+  socket.emit("client.add_player",name, clientID)
+}
 
 var get_hands=function() {
-socket.emit("client.get_hands",function(own_hand,other_hands){
+socket.emit("client.getHands",function(own_hand,other_hands){
   console.log(own_hand);
   console.log(other_hands);
 });

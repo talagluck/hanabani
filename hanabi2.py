@@ -198,14 +198,14 @@ class Player(object):
     def serialize_hand(self):
         serialized_hand=[]
         for key, tile in self.hand.items():
-            hand.append(tile.json())
+            self.hand.append(tile.json())
         return serialized_hand
 
     def serialize_other_hands(self):
         serialized_hands=[]
         for player in self.game.player_list:
             if player.client_id != self.client_id:
-                serialized_hands.append(player.serialize_hand)
+                serialized_hands.append(player.serialize_hand())
         return serialized_hands
 
     def serialize_own_hand(self):
@@ -308,9 +308,19 @@ class Game(object):
         self.state = Game.GAME_CREATED
 
     def add_player(self,name,client_id):
-        player = Player(self.game, name, client_id)
+        player = Player(self, name, client_id)
         self.player_list.append(player)
 
+    def get_player(self,client_id):
+        player = [player for player in self.player_list if player.client_id==client_id][0]
+        return player
+
+    def start_game(self):
+        if self.state != Game.GAME_PLAYING:
+            self.state = Game.GAME_PLAYING
+            return True
+        else:
+            return False
 
 class Game_House(object):
     def __init__(self):
