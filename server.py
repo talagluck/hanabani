@@ -8,6 +8,7 @@ socketio = SocketIO(app)
 user_list = []
 
 game_house = hanabi2.game_house
+game_house.games={}
 
 @app.route('/')
 def index():
@@ -17,18 +18,29 @@ def index():
 def handle_on_connect():
     return
 
-
-@socketio.on('client.user_joined')
-def user_joined(client_ID):
-    session["game_ID"] ="living room"
-    session["client_ID"] = client_ID
+@socketio.on('client.connected')
+def connected(client_ID):
     print('user joined', client_ID)
+    session["client_ID"] = client_ID
+    broadcast_game_list()
+
+    #TO DO: if this is an existing client, resume their game state
+
+@socketio.on('client.join_game')
+def user_joined(game_ID):
+    session["game_ID"] = game_ID
 
     if session["game_ID"] not in game_house.games:
         game_house.new_game(session["game_ID"], 5,5,8,3)
+        current_game().add_player("Guest " + session["client_ID"], session["client_ID"])
+        current_game().host=current_player()
+        broadcast_game_list()
+    else:
+        current_game().add_player("Guest " + session["client_ID"], session["client_ID"])
+
 
     join_room(session["game_ID"])
-    # print("reload!")
+    print("Client " + session["client_ID"] + " joined game " + session["game_ID"])
 
 @socketio.on('client.add_player')
 def add_player(name, client_ID):
@@ -59,6 +71,10 @@ def handle_request_update():
 
 
 #//////////////////////
+
+def broadcast_game_list():
+    emit('server.game_list',list(game_house.games.keys()),broadcast=True)
+
 @socketio.on('client event')
 def test_message(message):
     print(message)

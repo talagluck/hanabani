@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <script src = "/jquery-3.3.1.min.js"></script>
+  <script src = "/socket.io.slim.js"></script>
+  <script>
+
+var clientID = undefined;
+
+var socket = io();
+$(function(){
+
+  if (getCookieValue("hanabi_client_id")==""){
+    document.cookie = "hanabi_client_id=" + btoa(Math.random()).substr(5,10);
+  }
+
+  clientID = getCookieValue("hanabi_client_id");
+
+
+  socket.emit("client.connected", clientID, function(games){
+  });
+
+  document.getElementById('create-game').addEventListener('submit',function(event){
+    event.preventDefault();
+    var form = event.target;
+    var game_name = form.querySelector('#create-game-name')
+    console.log("Create game: ",game_name.value);
+    joinGame(game_name.value);
+  });
+}); // document onload
+
+socket.on("server.game_data", function(gameData){
+  console.log(gameData)
+})
+
+socket.on("server.game_list",function(games_list){
+  var listHTML = '';
+  games_list.forEach((game) => {
+    listHTML += `<li><a class="game-link" href="#" data-game="${game}">${game}</a></li>`;
+  } )
+  document.getElementById('games-list').innerHTML = listHTML;
+  var game_links = document.querySelector('.game-link')
+  if (game_links) {
+    game_links.addEventListener('click',function(event){
+      event.preventDefault();
+      var game = event.target.getAttribute('data-game');
+      console.log("clicked on game " + game);
+      joinGame(game);
+    });
+  }
+});
+
+var newGame = function(maxPlayers,mode,maxHints,maxLives){
+  socket.emit("client.new_game",maxPlayers,mode,maxHints,maxLives)
+  console.log("new game")
+}
+var startGame = function(){
+  socket.emit("client.start_game")
+}
+
+var joinGame = function(game_ID){
+  socket.emit("client.join_game",game_ID)
+
+}
+
+var getHands=function() {
+socket.emit("client.getHands",function(own_hand,other_hands){
+  console.log(own_hand);
+  console.log(other_hands);
+});
+}
+
+function getCookieValue(a) {
+    var b = document.cookie.match('(^|;)\\s*' + a + '\\s*=\\s*([^;]+)');
+    return b ? b.pop() : '';
+}
+
+  </script>
+  <title>Document</title>
+</head>
+<body>
+  <ul id="games-list">
+  </ul>
+  <form action="" id="create-game">
+    <input type="text" id="create-game-name">
+    <button type="submit" value="submit">Submit</button>
+  </form>
+</body>
+</html>

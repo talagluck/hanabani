@@ -1,3 +1,9 @@
+#build out a game_state to json function which can be passed in as state
+#build out components for self hand, other hand, and boards
+
+#after joining a game, subscribe to game updates in socketio
+#then render board+hands based on server data
+
 from random import shuffle
 # from collections import counter
 
@@ -306,8 +312,11 @@ class Game(object):
         self.board = Board()
         self.player_list=[]
         self.state = Game.GAME_CREATED
+        self.host = None
 
     def add_player(self,name,client_id):
+        if client_id in [player.client_id for player in self.player_list]:
+            return False
         player = Player(self, name, client_id)
         self.player_list.append(player)
 
@@ -322,7 +331,7 @@ class Game(object):
         else:
             return False
 
-class Game_House(object):
+class GameHouse(object):
     def __init__(self):
         self.games = {}
 
@@ -350,7 +359,7 @@ class Game_House(object):
 # ren = Player(d, "ren",2)
 # # print(ren.possible_hints)
 #
-game_house = Game_House()
+game_house = GameHouse()
 
 
 d=Deck()
